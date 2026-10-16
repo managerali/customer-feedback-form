@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNG Fittings Order Request</title>
+<style>
+  :root { --green:#16834a; --dark:#18352a; --muted:#63736b; --line:#dce6df; --bg:#f4f8f5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial,Helvetica,sans-serif; background:var(--bg); color:#1f2b25; }
+  header { background:linear-gradient(120deg,#123c2a,#16834a); color:white; padding:28px 18px; }
+  .wrap { max-width:1080px; margin:0 auto; }
+  .brand { font-size:13px; text-transform:uppercase; letter-spacing:1.5px; opacity:.85; }
+  h1 { margin:8px 0; font-size:clamp(25px,4vw,36px); }
+  header p { margin:0; opacity:.9; line-height:1.5; }
+  main { max-width:1080px; margin:22px auto 50px; padding:0 16px; }
+  .card { background:white; border:1px solid var(--line); border-radius:16px; padding:22px; margin-bottom:18px; box-shadow:0 4px 16px #18352a0a; }
+  h2 { margin:0 0 16px; font-size:21px; color:var(--dark); }
+  .hint { color:var(--muted); font-size:14px; line-height:1.5; margin-top:-8px; }
+  .fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+  label { display:block; font-size:13px; font-weight:700; margin-bottom:6px; }
+  input, textarea { width:100%; padding:12px; border:1px solid #cbd8cf; border-radius:9px; font:inherit; background:#fff; }
+  input:focus, textarea:focus { outline:2px solid #b7e2c8; border-color:var(--green); }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; min-width:550px; }
+  th { background:#f0f6f1; text-align:left; color:#385344; font-size:12px; text-transform:uppercase; letter-spacing:.4px; }
+  th,td { padding:12px 10px; border-bottom:1px solid #e6eee8; }\n  .category-row td { background:#eaf3ed; color:#245b3a; font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.5px; padding:10px; }
+  td { font-size:14px; }
+  td small { display:block; color:var(--muted); margin-top:3px; }
+  .qty { max-width:110px; padding:10px; }
+  .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+  button { border:0; border-radius:10px; padding:13px 18px; font-weight:700; font-size:14px; cursor:pointer; }
+  .primary { background:var(--green); color:white; }
+  .secondary { background:#eaf3ed; color:#1d633d; }
+  .primary:hover { background:#116b3b; }
+  .footer-note { color:var(--muted); font-size:12px; line-height:1.6; margin-top:14px; }
+  .status { display:none; padding:12px 14px; border-radius:9px; margin-top:14px; background:#edf7ef; color:#1b6036; font-size:14px; line-height:1.5; }
+  @media(max-width:650px) { .fields { grid-template-columns:1fr; } .card { padding:17px; } header { padding:24px 17px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand" id="brandLabel">YOUR COMPANY NAME</div>
+    <h1>CNG Fittings Order Request</h1>
+    <p>Select the fittings you need, enter quantities and submit your request.</p>
+  </div>
+</header>
+<main>
+  <form id="orderForm">
+    <section class="card">
+      <h2>Customer Details</h2>
+      <p class="hint">Please provide your contact and delivery information.</p>
+      <div class="fields">
+        <div><label for="customerName">Customer / Contact Person *</label><input id="customerName" name="customerName" required placeholder="Enter full name"></div>
+        <div><label for="company">Company Name</label><input id="company" name="company" placeholder="Enter company name"></div>
+        <div><label for="phone">Phone / WhatsApp Number *</label><input id="phone" name="phone" required type="tel" placeholder="Country code + number"></div>
+        <div><label for="email">Email Address</label><input id="email" name="email" type="email" placeholder="name@company.com"></div>
+        <div style="grid-column:1/-1"><label for="address">Delivery Address</label><textarea id="address" name="address" rows="2" placeholder="Enter delivery address"></textarea></div>
+        <div style="grid-column:1/-1"><label for="notes">Additional Requirements</label><textarea id="notes" name="notes" rows="2" placeholder="Any specifications, preferred delivery date, etc."></textarea></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Available CNG Fittings</h2>
+      <p class="hint">Enter the required quantity for each item. Leave items at 0 if you do not need them.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Item Code</th><th>Fitting Description</th><th>Unit</th><th>Quantity</th></tr></thead>
+          <tbody id="catalog"></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button class="secondary" type="button" id="clearBtn">Clear quantities</button>
+      </div>
+      <p class="footer-note">The items shown are examples for demonstration. Replace them with your actual CNG fittings catalogue before publishing.</p>
+    </section>
+    <section class="card">
+      <h2>Review & Submit</h2>
+      <p id="itemCount">0 different items selected</p>
+      <div class="actions">
+        <button class="primary" type="submit">Generate PDF & Continue to WhatsApp</button>
+      </div>
+      <div class="status" id="status" role="status"></div>
+      <p class="footer-note">This creates and downloads a PDF order request, then opens WhatsApp with a prepared message. For security and privacy, the website does not send anything until the customer completes the WhatsApp steps.</p>
+    </section>
+  </form>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+/* CONFIGURATION: Update these values before publishing. */
+const COMPANY_NAME = "YOUR COMPANY NAME";
+const COMPANY_EMAIL = "sales@yourcompany.com";
+const WHATSAPP_NUMBER = "919826080605"; // International format, digits only; no +, spaces or dashes.
+
+const fittings = [
+  { code:"1", name:"Union ⅜\" OD X ¾\" NPT", unit:"Piece", category:"Connectors and Unions" },
+  { code:"2", name:"Union ⅜\" OD", unit:"Piece", category:"Connectors and Unions" },
+  { code:"3", name:"Union ¼\" OD", unit:"Piece", category:"Connectors and Unions" },
+  { code:"4", name:"Connector Male ⅜\" OD X ¼\" MNPT", unit:"Piece", category:"Connectors and Unions" },
+  { code:"5", name:"Male Connector 1\" OD X 1\" NPT", unit:"Piece", category:"Connectors and Unions" },
+  { code:"6", name:"Straight Union Connector ⅜\" OD", unit:"Piece", category:"Connectors and Unions" },
+  { code:"7", name:"Male Connector ¾\" OD X ¾\" NPT", unit:"Piece", category:"Connectors and Unions" },
+  { code:"8", name:"Reducer Union 1\" NPT X ¾\" OD", unit:"Piece", category:"Connectors and Unions" },
+  { code:"9", name:"Reducer Union 1\" X ¾\" OD", unit:"Piece", category:"Connectors and Unions" },
+  { code:"10", name:"Bulk Head Union ⅜\" OD", unit:"Piece", category:"Connectors and Unions" },
+  { code:"11", name:"Union Tee ¾\" OD", unit:"Piece", category:"Tee and Elbows" },
+  { code:"12", name:"Union 1\" OD", unit:"Piece", category:"Tee and Elbows" },
+  { code:"13", name:"Tee ¾\" (DK-Lok)", unit:"Piece", category:"Tee and Elbows" },
+  { code:"14", name:"Tee ¾\" (HY-LOK)", unit:"Piece", category:"Tee and Elbows" },
+  { code:"15", name:"Tee 1\" OD", unit:"Piece", category:"Tee and Elbows" },
+  { code:"16", name:"Elbow ⅜\" OD", unit:"Piece", category:"Tee and Elbows" },
+  { code:"17", name:"Union Tee ⅜\"", unit:"Piece", category:"Tee and Elbows" },
+  { code:"18", name:"Ball Valve ¾\" OD (DK-LOK)", unit:"Piece", category:"Valves and Manifold" },
+  { code:"19", name:"Ball Valve ¾\" OD (HY-LOK)", unit:"Piece", category:"Valves and Manifold" },
+  { code:"20", name:"2-ways Manifold ½\" OD NNPT", unit:"Piece", category:"Valves and Manifold" },
+  { code:"21", name:"Ball Valve 1\" OD", unit:"Piece", category:"Valves and Manifold" },
+  { code:"22", name:"Ball Valve ½\" OD (DK-LOK)", unit:"Piece", category:"Valves and Manifold" },
+  { code:"23", name:"Saftey Relieve Valve 6,000psig/413bar ¼\" OD", unit:"Piece", category:"Valves and Manifold" }
+];
+
+document.getElementById("brandLabel").textContent = COMPANY_NAME;
+const catalog = document.getElementById("catalog");
+let lastCategory = "";
+fittings.forEach((item, i) => {
+  if (item.category !== lastCategory) {
+    const heading = document.createElement("tr");
+    heading.className = "category-row";
+    heading.innerHTML = `<td colspan="4">${item.category}</td>`;
+    catalog.appendChild(heading);
+    lastCategory = item.category;
+  }
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${item.code}</td><td>${item.name}</td><td>${item.unit}</td><td><input class="qty" type="number" min="0" step="1" value="0" inputmode="numeric" aria-label="Quantity for ${item.name}" data-index="${i}"></td>`;
+  catalog.appendChild(tr);
+});
+function selectedItems() {
+  return fittings.map((f, i) => ({...f, qty:Number(document.querySelector(`[data-index="${i}"]`).value || 0)}))
+    .filter(f => Number.isFinite(f.qty) && f.qty > 0);
+}
+function updateCount() {
+  const n = selectedItems().length;
+  document.getElementById("itemCount").textContent = `${n} different item${n===1?"":"s"} selected`;
+}
+catalog.addEventListener("input", updateCount);
+document.getElementById("clearBtn").addEventListener("click", () => {
+  document.querySelectorAll(".qty").forEach(el => el.value = 0);
+  updateCount();
+});
+function val(id) { return document.getElementById(id).value.trim(); }
+function safeFilePart(s) { return s.replace(/[^a-z0-9_-]+/gi,"_").replace(/^_+|_+$/g,"").slice(0,50) || "Customer"; }
+
+document.getElementById("orderForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const items = selectedItems();
+  const status = document.getElementById("status");
+  if (!items.length) {
+    status.style.display = "block";
+    status.textContent = "Please enter a quantity for at least one fitting.";
+    return;
+  }
+  if (!/^\d{8,15}$/.test(WHATSAPP_NUMBER) || WHATSAPP_NUMBER === "2348000000000") {
+    status.style.display = "block";
+    status.textContent = "The website needs your correct WhatsApp destination number configured before it can continue. Please contact the website administrator.";
+    return;
+  }
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    status.style.display = "block";
+    status.textContent = "PDF library could not load. Please check your internet connection and try again.";
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 16;
+  let y = 18;
+  doc.setFont("helvetica","bold"); doc.setFontSize(18);
+  doc.text(COMPANY_NAME, margin, y); y += 9;
+  doc.setFontSize(14); doc.text("CNG Fittings Order Request", margin, y); y += 7;
+  doc.setFont("helvetica","normal"); doc.setFontSize(9);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, margin, y); y += 10;
+  doc.setDrawColor(190,205,195); doc.line(margin,y,pageWidth-margin,y); y += 8;
+  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.text("Customer Details",margin,y); y += 7;
+  doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  const details = [
+    ["Customer",val("customerName")],["Company",val("company")],["Phone",val("phone")],
+    ["Email",val("email")],["Delivery Address",val("address")],["Additional Requirements",val("notes")]
+  ];
+  details.forEach(([label,value]) => {
+    if (!value) return;
+    const lines = doc.splitTextToSize(`${label}: ${value}`, pageWidth - margin*2);
+    if (y + lines.length*5 > 275) { doc.addPage(); y=18; }
+    doc.text(lines, margin, y); y += lines.length*5 + 1;
+  });
+  y += 4;
+  if (y > 255) { doc.addPage(); y=18; }
+  doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.text("Requested Fittings",margin,y); y += 8;
+  const cols = [margin, margin+27, margin+112, margin+143];
+  doc.setFontSize(9); doc.setFillColor(235,243,237); doc.rect(margin,y-5,pageWidth-margin*2,8,"F");
+  doc.text("Code",cols[0]+1,y); doc.text("Description",cols[1],y); doc.text("Unit",cols[2],y); doc.text("Qty",cols[3],y); y += 8;
+  doc.setFont("helvetica","normal");
+  let lastPdfCategory = "";
+  items.forEach(item => {
+    if (item.category !== lastPdfCategory) {
+      if (y > 265) { doc.addPage(); y=18; }
+      y += 2;
+      doc.setFont("helvetica","bold"); doc.setFontSize(9);
+      doc.text(item.category, margin, y);
+      y += 6;
+      doc.setFont("helvetica","normal");
+      lastPdfCategory = item.category;
+    }
+    if (y > 275) { doc.addPage(); y=18; }
+    const descLines = doc.splitTextToSize(item.name, 78);
+    doc.text(item.code,cols[0]+1,y);
+    doc.text(descLines,cols[1],y);
+    doc.text(item.unit,cols[2],y);
+    doc.text(String(item.qty),cols[3],y);
+    y += Math.max(7,descLines.length*5);
+    doc.setDrawColor(225,232,226); doc.line(margin,y-3,pageWidth-margin,y-3);
+  });
+  y += 7;
+  doc.setFont("helvetica","bold"); doc.text(`Total different items: ${items.length}`,margin,y);
+  y += 12; doc.setFont("helvetica","normal"); doc.setFontSize(8);
+  doc.text("This document is an order request and not a confirmed sales invoice.",margin,y);
+  const filename = `CNG_Order_${safeFilePart(val("customerName"))}_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(filename);
+
+  const summary = items.map(i => `${i.code} - ${i.name}: ${i.qty} ${i.unit}`).join("\n");
+  const message = `Hello ${COMPANY_NAME}, please find my CNG fittings order request.\nCustomer: ${val("customerName")}\nCompany: ${val("company") || "N/A"}\nPhone: ${val("phone")}\nItems requested:\n${summary}\n\nI will attach the generated PDF to this chat.`;
+  const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  status.style.display = "block";
+  status.textContent = "Your PDF order request has been generated and downloaded. WhatsApp will open in a new tab; please attach the downloaded PDF and press Send.";
+  window.open(waUrl, "_blank", "noopener,noreferrer");
+});
+updateCount();
+</script>
+</body>
+</html>
